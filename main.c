@@ -1,15 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "userAuthentication.h"
 #include "graphs.h"
 #include "mst.h"
 #include "connectivity.h"
 
 int main(){
+
+    if(!mainPage()) {
+        return 0; // Exit if authentication fails
+    }
+
     int V, E, cost, distance;
     char b1[MAX], b2[MAX];
 
-    printf("Enter number of buildings: ");
+    printf("\nEnter number of buildings: ");
     scanf("%d", &V);
     getchar();
 
@@ -18,6 +24,7 @@ int main(){
     printf("Enter building names: \n");
     int i;
     for(i=0; i<V; i++){
+        printf("%d.) ",i+1);
         scanf("%s", g->names[i]);
     }
 
@@ -26,6 +33,7 @@ int main(){
 
     printf("Enter paths in format: From To Cost Distance\n");
     for(i=0; i<E; i++){
+        printf("\nEdge %d:\n",i+1);
         scanf("%s %s %d %d", b1, b2, &cost, &distance);
 
         int u = -1, v = -1;
