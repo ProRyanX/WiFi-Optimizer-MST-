@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Network Analyzer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: #1a1a2e; color: #e6e6ff; padding: 20px; }
+        .container { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .panel { background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #0f3460; }
+        .panel h2 { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #0f3460; color: #e94560; }
+        .input-group { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        label { font-weight: 500; color: #a9b7d8; }
+        input, select, button { padding: 10px 14px; border-radius: 8px; font-size: 14px; border: none; }
+        input, select { background: #0f3460; color: #e6e6ff; border: 1px solid #1a5fb4; }
+        button { background: linear-gradient(135deg, #e94560, #ff6b9d); color: white; cursor: pointer; transition: all 0.3s; font-weight: 600; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4); }
+        .name-container, .edge-container { margin-top: 15px; max-height: 200px; overflow-y: auto; padding: 15px; border-radius: 8px; background: #0f3460; }
+        .name-row, .edge-row { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+        .name-row label, .edge-row label { width: 80px; margin-bottom: 0; }
+        .results-container { display: flex; flex-direction: column; height: 100%; gap: 20px; }
+        #graph-container { flex: 1; border-radius: 8px; min-height: 400px; background: #0f3460; border: 1px solid #1a5fb4; }
+        #text-results { flex: 1; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 14px; background: #0f3460; overflow-y: auto; max-height: 400px; border: 1px solid #1a5fb4; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #16213e; padding: 25px; border-radius: 12px; width: 340px; border: 1px solid #0f3460; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-buttons { display: flex; justify-content: flex-end; margin-top: 20px; gap: 10px; }
+        .auth-section { background: #0f3460; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .user-info { background: #2d7d46; padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; }
+        .logout-btn { background: #c53030 !important; }
+    </style>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h2>Login Required</h2>
+            <div class="input-group">
+                <label>Username:</label>
+                <input type="text" id="username" placeholder="Enter username">
+            </div>
+            <div class="input-group">
+                <label>Password:</label>
+                <input type="password" id="password" placeholder="Enter password">
+            </div>
+            <div class="modal-buttons">
+                <button id="login-btn">Login</button>
+            </div>
+            <div style="text-align: center; margin-top: 15px; font-size: 12px; color: #a9b7d8;">
+                Demo: any username + password "admin"
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="main-content" style="display: none;">
+        <div class="left-column">
+            <!-- User Info Section -->
+            <div class="panel">
+                <div class="user-info">
+                    Welcome, <span id="user-display">User</span>!
+                    <button class="logout-btn" id="logout-btn" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Logout</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Graph Input</h2>
+                <div class="input-group">
+                    <label>Buildings (V):</label>
+                    <input type="number" id="building-count" min="1" max="20" value="3">
+                    <button id="generate-names">Generate Names</button>
+                </div>
+                <div id="name-container" class="name-container"></div>
+            </div>
+            
+            <div class="panel">
+                <h2>Directed Edges</h2>
+                <div class="input-group">
+                    <label>Edges (E):</label>
+                    <input type="number" id="edge-count" min="1" max="50" value="3">
+                    <button id="generate-edges">Generate Edges</button>
+                </div>
+                <div id="edge-container" class="edge-container"></div>
+            </div>
+            
+            <div class="panel">
+                <button id="analyze-btn" style="width: 100%; padding: 14px; font-size: 16px;">Analyze Network</button>
+            </div>
+        </div>
+        
+        <div class="right-column">
+            <div class="panel">
+                <h2>Results</h2>
+                <div class="results-container">
+                    <div id="graph-container"></div>
+                    <div id="text-results"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="path-modal" class="modal">
+        <div class="modal-content">
+            <h2>Path Query</h2>
+            <div class="input-group">
+                <label>From:</label>
+                <select id="from-building"></select>
+            </div>
+            <div class="input-group">
+                <label>To:</label>
+                <select id="to-building"></select>
+            </div>
+            <div class="modal-buttons">
+                <button id="analyze-path">Analyze Path</button>
+                <button id="close-modal" style="background: #4a5568;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple Authentication System
+        const auth = {
+            isAuthenticated: false,
+            currentUser: '',
+            
+            login(username, password) {
+                // Simple demo authentication - in real app, verify against backend
+                if (password === 'admin') {
+                    this.isAuthenticated = true;
+                    this.currentUser = username;
+                    localStorage.setItem('campusAuth', JSON.stringify({ user: username, loggedIn: true }));
+                    return true;
+                }
+                return false;
+            },
+            
+            logout() {
+                this.isAuthenticated = false;
+                this.currentUser = '';
+                localStorage.removeItem('campusAuth');
+            },
+            
+            checkStoredAuth() {
+                const stored = localStorage.getItem('campusAuth');
+                if (stored) {
+                    const authData = JSON.parse(stored);
+                    this.isAuthenticated = authData.loggedIn;
+                    this.currentUser = authData.user;
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        // Application state
+        const state = { 
+            buildingCount: 3, 
+            edgeCount: 3, 
+            buildingNames: [], 
+            edgeList: [] 
+        };
+
+        // DOM elements
+        const elements = {
+            // Auth elements
+            loginModal: document.getElementById('login-modal'),
+            mainContent: document.getElementById('main-content'),
+            username: document.getElementById('username'),
+            password: document.getElementById('password'),
+            loginBtn: document.getElementById('login-btn'),
+            logoutBtn: document.getElementById('logout-btn'),
+            userDisplay: document.getElementById('user-display'),
+            
+            // App elements
+            buildingCount: document.getElementById('building-count'),
+            edgeCount: document.getElementById('edge-count'),
+            generateNames: document.getElementById('generate-names'),
+            generateEdges: document.getElementById('generate-edges'),
+            analyzeBtn: document.getElementById('analyze-btn'),
+            nameContainer: document.getElementById('name-container'),
+            edgeContainer: document.getElementById('edge-container'),
+            graphContainer: document.getElementById('graph-container'),
+            textResults: document.getElementById('text-results'),
+            pathModal: document.getElementById('path-modal'),
+            fromBuilding: document.getElementById('from-building'),
+            toBuilding: document.getElementById('to-building'),
+            analyzePath: document.getElementById('analyze-path'),
+            closeModal: document.getElementById('close-modal')
+        };
+
+        // Initialize the application
+        function init() {
+            // Check if user is already logged in
+            if (auth.checkStoredAuth()) {
+                showMainApp();
+            } else {
+                showLogin();
+            }
+
+            // Auth event listeners
+            elements.loginBtn.addEventListener('click', handleLogin);
+            elements.logoutBtn.addEventListener('click', handleLogout);
+            elements.password.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleLogin();
+            });
+
+            // App event listeners
+            elements.generateNames.addEventListener('click', generateNameFields);
+            elements.generateEdges.addEventListener('click', generateEdgeFields);
+            elements.analyzeBtn.addEventListener('click', runAnalysis);
+            elements.analyzePath.addEventListener('click', analyzePath);
+            elements.closeModal.addEventListener('click', () => elements.pathModal.style.display = 'none');
+            
+            generateNameFields();
+        }
+
+        // Auth functions
+        function handleLogin() {
+            const username = elements.username.value.trim();
+            const password = elements.password.value;
+
+            if (!username || !password) {
+                alert('Please enter both username and password');
+                return;
+            }
+
+            if (auth.login(username, password)) {
+                showMainApp();
+            } else {
+                alert('Invalid credentials. Use any username with password "admin"');
+            }
+        }
+
+        function handleLogout() {
+            auth.logout();
+            showLogin();
+        }
+
+        function showMainApp() {
+            elements.loginModal.style.display = 'none';
+            elements.mainContent.style.display = 'grid';
+            elements.userDisplay.textContent = auth.currentUser;
+        }
+
+        function showLogin() {
+            elements.loginModal.style.display = 'flex';
+            elements.mainContent.style.display = 'none';
+            elements.username.value = '';
+            elements.password.value = '';
+        }
+
+        // Original app functions (unchanged)
+        function generateNameFields() {
+            const count = Math.max(1, Math.min(20, parseInt(elements.buildingCount.value) || 3));
+            elements.nameContainer.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const row = document.createElement('div');
+                row.className = 'name-row';
+                row.innerHTML = `<label>Bldg ${i+1}:</label><input type="text" value="Bldg_${i+1}">`;
+                elements.nameContainer.appendChild(row);
+            }
+        }
+
+        function generateEdgeFields() {
+            const count = Math.max(1, Math.min(50, parseInt(elements.edgeCount.value) || 3));
+            const names = [...elements.nameContainer.querySelectorAll('input')].map(i => i.value.trim());
+            if (!names.length || !names.every(n => n) || new Set(names).size !== names.length) {
+                alert('All building names must be non-empty and unique!'); return;
+            }
+            elements.edgeContainer.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const row = document.createElement('div');
+                row.className = 'edge-row';
+                row.innerHTML = `
+                    <label>${i+1}:</label>
+                    <select>${names.map((n, idx) => `<option value="${idx}">${n}</option>`).join('')}</select>
+                    <select>${names.map((n, idx) => `<option value="${idx}">${n}</option>`).join('')}</select>
+                    <input type="number" min="0" value="10" placeholder="Cost" style="width:70px">
+                    <input type="number" min="0" value="100" placeholder="Dist" style="width:70px">
+                `;
+                if (names.length >= 2) row.querySelectorAll('select')[1].selectedIndex = 1;
+                elements.edgeContainer.appendChild(row);
+            }
+        }
+
+        function runAnalysis() {
+            const names = [...elements.nameContainer.querySelectorAll('input')].map(i => i.value.trim());
+            if (!names.length || !names.every(n => n) || new Set(names).size !== names.length) {
+                alert('All building names must be non-empty and unique!');
+                return;
+            }
+
+            state.buildingNames = names;
+            state.edgeList = [...elements.edgeContainer.querySelectorAll('.edge-row')].map(row => {
+                const [from, to, cost, dist] = row.querySelectorAll('select, input');
+                return { 
+                    from: parseInt(from.value),
+                    to: parseInt(to.value),
+                    cost: parseInt(cost.value) || 0,
+                    dist: parseInt(dist.value) || 0 
+                };
+            }).filter(e => e.cost >= 0 && e.dist >= 0);
+
+            if (!state.edgeList.length) {
+                alert('No valid edges entered!');
+                return;
+            }
+
+            // Build payload for Flask
+            const payload = {
+                buildings: state.buildingNames,
+                edges: state.edgeList,
+                src: 0,                               // default source for global MST/shortest; you can change later
+                dest: Math.min(1, names.length - 1)
+            };
+
+            // Call backend
+            fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log('ANALYZE RESULT:', data);
+                // Show textual + graph results using backend data
+                showTextualResults(data);
+                drawGraph();
+                openPathQueryDialog();
+            })
+            .catch(err => {
+                console.error('Error calling /analyze:', err);
+                alert('Backend error while analyzing network.');
+            });
+        }
+
+        function showTextualResults(data) {
+            const adj = Array(state.buildingNames.length).fill().map(() => []);
+            state.edgeList.forEach(e => {
+                adj[e.from].push(`${state.buildingNames[e.to]} (c:${e.cost}, d:${e.dist})`);
+            });
+
+            const mstLines = data.mst_edges.map(
+                e => `${e.from} → ${e.to} (c:${e.cost}, d:${e.dist})`
+            ).join('<br>') || 'No MST edges found.';
+
+            const shortestText = (data.shortest_distance == null)
+                ? 'No path (unreachable).'
+                : `${data.shortest_distance}`;
+
+            elements.textResults.innerHTML = `
+                <h3>=== ADJACENCY LIST ===</h3>
+                ${state.buildingNames.map((n, i) =>
+                    `<div>${n} → ${adj[i].join(' → ') || 'NULL'}</div>`
+                ).join('')}
+                <h3>=== MINIMUM SPANNING TREE ===</h3>
+                <div>Total Cost: ${data.mst_cost}</div>
+                <div>Edges:<br>${mstLines}</div>
+                <h3>=== GLOBAL SHORTEST DISTANCE (0 → 1) ===</h3>
+                <div>${shortestText}</div>
+            `;
+        }
+
+
+        function analyzePath() {
+            const startIdx = parseInt(elements.fromBuilding.value);
+            const endIdx = parseInt(elements.toBuilding.value);
+
+            const payload = {
+                buildings: state.buildingNames,
+                edges: state.edgeList,
+                src: startIdx,
+                dest: endIdx
+            };
+
+            fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                const start = state.buildingNames[startIdx];
+                const end = state.buildingNames[endIdx];
+
+                const pathResults = document.createElement('div');
+                pathResults.innerHTML = `<h3>=== PATH ${start} → ${end} ===</h3>`;
+                pathResults.innerHTML += `<div>Connectivity : ${data.connected ? 'Connected' : 'Not Connected'}</div>`;
+                pathResults.innerHTML += `<div>Shortest Dist: ${
+                    data.shortest_distance == null ? 'No path' : data.shortest_distance
+                }</div>`;
+
+                elements.textResults.appendChild(pathResults);
+                elements.pathModal.style.display = 'none';
+            })
+            .catch(err => {
+                console.error('Error calling /analyze for path:', err);
+                alert('Backend error while analyzing path.');
+            });
+        }
+
+
+        function openPathQueryDialog() {
+            elements.fromBuilding.innerHTML = elements.toBuilding.innerHTML = 
+                state.buildingNames.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+            elements.fromBuilding.selectedIndex = 0;
+            elements.toBuilding.selectedIndex = Math.min(1, state.buildingNames.length - 1);
+            elements.pathModal.style.display = 'flex';
+        }
+
+        function drawGraph() {
+            elements.graphContainer.innerHTML = '';
+            const width = elements.graphContainer.clientWidth;
+            const height = elements.graphContainer.clientHeight;
+
+            const svg = d3.select('#graph-container').append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            const nodes = state.buildingNames.map((name, i) => ({ id: i, name }));
+            const links = state.edgeList.map(e => ({
+                source: e.from,               // was e.u
+                target: e.to,                 // was e.v
+                label: `c:${e.cost}/d:${e.dist}`
+            }));
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+            
+            svg.append('defs').append('marker')
+                .attr('id', 'arrowhead').attr('viewBox', '0 -5 10 10').attr('refX', 15).attr('refY', 0)
+                .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+                .append('path').attr('d', 'M0,-5L10,0L0,5').attr('fill', '#e94560');
+            
+            const link = svg.append('g').selectAll('line').data(links).enter().append('line')
+                .attr('stroke', '#e94560').attr('stroke-width', 2).attr('marker-end', 'url(#arrowhead)');
+            
+            const node = svg.append('g').selectAll('circle').data(nodes).enter().append('circle')
+                .attr('r', 20).attr('fill', '#4cc9f0')
+                .call(d3.drag().on('start', dragStart).on('drag', drag).on('end', dragEnd));
+            
+            const nodeLabels = svg.append('g').selectAll('text').data(nodes).enter().append('text')
+                .text(d => d.name).attr('text-anchor', 'middle').attr('dy', '.3em').attr('font-size', '10px').attr('fill', '#fff');
+            
+            const edgeLabels = svg.append('g').selectAll('text').data(links).enter().append('text')
+                .text(d => d.label).attr('font-size', '9px').attr('text-anchor', 'middle').attr('fill', '#ffb6c1');
+            
+            simulation.on('tick', () => {
+                link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+                node.attr('cx', d => d.x).attr('cy', d => d.y);
+                nodeLabels.attr('x', d => d.x).attr('y', d => d.y);
+                edgeLabels.attr('x', d => (d.source.x + d.target.x) / 2).attr('y', d => (d.source.y + d.target.y) / 2);
+            });
+            
+            function dragStart(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+            function drag(event, d) { d.fx = event.x; d.fy = event.y; }
+            function dragEnd(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = d.fy = null; }
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

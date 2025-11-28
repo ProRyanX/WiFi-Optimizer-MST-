@@ -58,30 +58,43 @@ int cmpEdges(const void* a, const void* b) {
 }
 
 // ---------------- Kruskal MST function ----------------
-int kruskalMST(GraphMST* g, Graph* gOriginal) {
-    qsort(g->edges, g->E, sizeof(EdgeMST), cmpEdges);
+int computeMST(Graph* g, EdgeMST* outEdges, int maxEdges) {
+    // 1) Build edge list from adjacency list
+    GraphMST* gm = convertToEdgeArray(g);
 
-    int* parent = (int*)malloc(g->V * sizeof(int));
-    for (int i = 0; i < g->V; i++) parent[i] = i;
+    // 2) Sort and compute MST using your existing Kruskal
+    qsort(gm->edges, gm->E, sizeof(EdgeMST), cmpEdges);
+
+    int* parent = (int*)malloc(gm->V * sizeof(int));
+    for (int i = 0; i < gm->V; i++) parent[i] = i;
 
     int mst_cost = 0;
-    printf("Edges in MST:\n");
-    for (int i = 0; i < g->E; i++) {
-        int u = g->edges[i].src;
-        int v = g->edges[i].dest;
+    int count = 0;
+
+    for (int i = 0; i < gm->E && count < maxEdges; i++) {
+        int u = gm->edges[i].src;
+        int v = gm->edges[i].dest;
 
         int set_u = findSet(parent, u);
         int set_v = findSet(parent, v);
 
         if (set_u != set_v) {
-            mst_cost += g->edges[i].cost;
-            printf("%s - %s : cost=%d, distance=%d\n",
-                   gOriginal->names[u], gOriginal->names[v],
-                   g->edges[i].cost, g->edges[i].distance);
+            // Take this edge into the MST
+            mst_cost += gm->edges[i].cost;
+
+            outEdges[count].src      = u;
+            outEdges[count].dest     = v;
+            outEdges[count].cost     = gm->edges[i].cost;
+            outEdges[count].distance = gm->edges[i].distance;
+            count++;
+
             unionSets(parent, set_u, set_v);
         }
     }
 
     free(parent);
-    return mst_cost;
+    free(gm->edges);
+    free(gm);
+
+    return mst_cost;     // Python gets the cost; edges are in outEdges[0..count-1]
 }

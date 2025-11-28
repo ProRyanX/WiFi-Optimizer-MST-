@@ -20,6 +20,6 @@ typedef struct GraphMST {
 
 // MST Functions
 GraphMST* convertToEdgeArray(Graph* g);
-int kruskalMST(GraphMST* g, Graph* gOriginal);
+int computeMST(Graph* g, EdgeMST* outEdges, int maxEdges);
 
 #endif

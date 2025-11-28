@@ -32,7 +32,7 @@ bool isConnected(Graph* graph, int src, int dest) {
 }
 
 // Dijkstra’s algorithm for shortest distance
-void dijkstra(Graph* graph, int src, int dest) {
+int dijkstraDistance(Graph* graph, int src, int dest) {
     int dist[graph->V];
     bool visited[graph->V];
 
@@ -45,14 +45,13 @@ void dijkstra(Graph* graph, int src, int dest) {
     for (int count = 0; count < graph->V - 1; count++) {
         int min = INT_MAX, u = -1;
 
-        // Pick the unvisited vertex with the smallest distance
         for (int v = 0; v < graph->V; v++)
             if (!visited[v] && dist[v] <= min) {
                 min = dist[v];
                 u = v;
             }
 
-        if (u == -1) break; // No reachable vertex remains
+        if (u == -1) break;
         visited[u] = true;
 
         Node* temp = graph->adjList[u];
@@ -66,9 +65,7 @@ void dijkstra(Graph* graph, int src, int dest) {
     }
 
     if (dist[dest] == INT_MAX)
-        printf("No path exists between %s and %s.\n",
-               graph->names[src], graph->names[dest]);
+        return -1;              // no path
     else
-        printf("Shortest distance between %s and %s is: %d\n",
-               graph->names[src], graph->names[dest], dist[dest]);
+        return dist[dest];      // actual shortest distance
 }

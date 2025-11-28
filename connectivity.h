@@ -10,6 +10,6 @@
 
 //-------------Connectivity Functions-------------
 bool isConnected(Graph* graph, int src, int dest);
-void dijkstra(Graph* graph, int src, int dest);
+int dijkstraDistance(Graph* graph, int src, int dest);
 
 #endif
